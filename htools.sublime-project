@@ -1,0 +1,11 @@
+{
+	"folders":
+	[
+		{
+			"path": ".",
+			"folder_exclude_patterns": [".direnv", ".idea", "vue_app/node_modules", "vue_app/dist", "Htools.egg-info", "__pycache__", 
+                "vue_app/src/assets/vendor" , "python_app/static/vue_built"               
+            ],
+		}
+	]
+}

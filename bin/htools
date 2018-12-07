@@ -1,0 +1,133 @@
+#!/usr/bin/env python
+
+import click
+import subprocess as sp
+from pathlib import Path
+import os
+import signal
+import socket
+import webbrowser
+
+
+
+ROOT = (Path(__file__).parent.parent)
+PYDIR = ROOT / 'python_app'
+VUEDIR = ROOT / 'vue_app'
+VUE_DIST = PYDIR / 'static' / 'vue_built'
+BINDIR = ROOT / 'bin'
+
+FLASK_PORT = '8027' # Hopefully it is open
+FLASK_HOST = '0.0.0.0' # Available to whole network
+
+
+
+@click.group()
+def cli():
+    pass
+
+
+def title(description):
+    print("\n"+"*"*90)
+    print('***** {0}'.format(description))
+
+def print_cmd(cmd):
+    print('command: ' + ' '.join(cmd))
+
+
+@cli.command()
+@click.option('--py/--no-py', help="Run python server", default=True)
+@click.option('--vue/--no-vue', help="Run vue server", default=True)
+def dev(py, vue):
+    """
+    DEV - Run flask & vue both in development mode
+    """
+    title('Running Flask & Vue in development mode')
+    env_new = {
+        'FLASK_ENV' : 'development',
+        'FLASK_APP' : 'app.py'
+    }
+    env = {**os.environ , **env_new}
+
+    pyapp, vueapp = None, None
+
+    if py:
+        pyapp = sp.Popen(['flask', 'run',
+                          '--host', FLASK_HOST, '--port', FLASK_PORT], env=env, cwd=PYDIR)
+        print('BACK FROM PYAPP SPAWN')
+    if vue:
+        vueapp = sp.Popen(['./node_modules/.bin/vue-cli-service', 'serve'], cwd=VUEDIR)
+        print('BACK from VUEAPP SPAWN')
+
+    def kill_servers(signal, frame):
+        if pyapp:
+            pyapp.kill()
+        if vueapp:
+            vueapp.kill()
+
+    signal.signal(signal.SIGINT, kill_servers)
+    signal.signal(signal.SIGTERM, kill_servers)
+
+    if pyapp:
+        pyapp.wait()
+    elif vueapp:
+        vueapp.wait()
+    else:
+        print('No apps to wait for. Exiting.')
+
+@cli.command()
+def find_ip():
+    """
+    Find the IP address of this machine.
+    """
+    ip = socket.gethostbyname(socket.gethostname())
+    print(f'IP Address of this machine: {ip}')
+    return ip
+
+
+@cli.command()
+@click.option('-o', '--open/--no-open', 'open_browser', help="Open in browser", is_flag=True, default=True)
+@click.option('--hubitat_ip', help="IP Address of the Hubitat portal. Eg: 192.168.1.155",type=str)
+@click.option('--max_past_log_lines', help="Max log lines to get", type=int, default=1000)
+def run(open_browser, hubitat_ip, max_past_log_lines):
+    """
+    Run the HTools production server
+    """
+    title(f'Running HTools. In your browser open: http://127.0.0.1:8027 or http://{socket.gethostbyname(socket.gethostname())}:8027')
+    print()
+    
+    env_new = {
+        'FLASK_ENV' : 'development',
+        'FLASK_APP' : 'app.py'
+    }
+    env = {**os.environ , **env_new}
+
+    pyapp = sp.Popen(['flask', 'run',
+                          '--host', FLASK_HOST, '--port', FLASK_PORT], env=env, cwd=PYDIR)
+ 
+    if open_browser:
+        url = f'http://{socket.gethostbyname(socket.gethostname())}:8027' \
+              f'?maxPastLogLines={max_past_log_lines}' \
+              f'&hubitatIP={hubitat_ip}'
+        webbrowser.open(url)
+
+    def kill_server(signal, frame):
+        pyapp.kill()
+
+    signal.signal(signal.SIGINT, kill_server)
+    signal.signal(signal.SIGTERM, kill_server)
+
+    pyapp.wait()
+
+
+
+@cli.command()
+def build():
+   """
+   Build vue for production
+   """
+   title('Build Vue for Python Deployment')
+   sp.run(['./node_modules/.bin/vue-cli-service', 'build', '--dest', str(VUE_DIST.resolve())], cwd=VUEDIR)
+
+
+if __name__ == "__main__":
+    cli()
