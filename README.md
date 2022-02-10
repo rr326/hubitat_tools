@@ -1,3 +1,10 @@
+# DEPRECATED
+
+No longer maintained. 
+
+<hr>
+
+
 # Hubitat Tools
 
 ## Overview
